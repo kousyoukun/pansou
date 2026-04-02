@@ -1,6 +1,7 @@
 services:
   pansou:
-    image: ghcr.io/fish2018/pansou:latest
+    build: .
+    image: pansou:local
     container_name: pansou
     restart: unless-stopped
     environment:
@@ -18,7 +19,7 @@ services:
       - ASYNC_MAX_BACKGROUND_TASKS=100
       - ASYNC_CACHE_TTL_HOURS=1
       # 认证配置（可选）
-      - AUTH_ENABLED=false
+      - AUTH_ENABLED=true
       - AUTH_USERS=admin:admin123
       - AUTH_TOKEN_EXPIRY=24
       - AUTH_JWT_SECRET=your-secret-key-here

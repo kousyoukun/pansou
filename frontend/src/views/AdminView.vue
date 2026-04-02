@@ -118,7 +118,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { authApi, adminApi } from '../utils/api'
 
 const router = useRouter()
 
@@ -147,9 +147,13 @@ const isSaving = ref(false)
 const message = ref('')
 
 // 处理登出
-const handleLogout = () => {
-  localStorage.removeItem('token')
-  router.push('/login')
+const handleLogout = async () => {
+  try {
+    await authApi.logout()
+  } finally {
+    localStorage.removeItem('token')
+    router.push('/login')
+  }
 }
 
 // 保存系统配置
@@ -159,11 +163,7 @@ const saveConfig = async () => {
   
   try {
     // 发送保存请求
-    const response = await axios.post('/api/config', configForm.value, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
+    const response = await adminApi.saveConfig(configForm.value)
     
     if (response.data.code === 200) {
       message.value = '配置保存成功'
@@ -185,11 +185,7 @@ const savePlugins = async () => {
   try {
     // 发送保存请求
     const enabledPlugins = plugins.value.filter(p => p.enabled).map(p => p.name)
-    const response = await axios.post('/api/plugins', { plugins: enabledPlugins }, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
+    const response = await adminApi.savePlugins(enabledPlugins)
     
     if (response.data.code === 200) {
       message.value = '插件配置保存成功'
@@ -208,11 +204,7 @@ const saveSearchParams = async () => {
   
   try {
     // 发送保存请求
-    const response = await axios.post('/api/search/params', searchParams.value, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
+    const response = await adminApi.saveSearchParams(searchParams.value)
     
     if (response.data.code === 200) {
       message.value = '搜索参数保存成功'

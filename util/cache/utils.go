@@ -2,9 +2,8 @@ package cache
 
 import (
 	"bytes"
+	"encoding/json"
 	"sync"
-	
-	"pansou/util/json"
 )
 
 // 缓冲区对象池
@@ -20,8 +19,8 @@ func SerializeWithPool(v interface{}) ([]byte, error) {
 	buf.Reset()
 	defer bufferPool.Put(buf)
 	
-	// 使用sonic直接编码到缓冲区
-	encoder := json.API.NewEncoder(buf)
+	// 使用标准库直接编码到缓冲区
+	encoder := json.NewEncoder(buf)
 	if err := encoder.Encode(v); err != nil {
 		return nil, err
 	}
@@ -41,7 +40,7 @@ func DeserializeWithPool(data []byte, v interface{}) error {
 	// 写入数据到缓冲区
 	buf.Write(data)
 	
-	// 使用sonic从缓冲区解码
-	decoder := json.API.NewDecoder(buf)
+	// 使用标准库从缓冲区解码
+	decoder := json.NewDecoder(buf)
 	return decoder.Decode(v)
 } 

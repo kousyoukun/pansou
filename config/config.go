@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -549,6 +551,7 @@ func getAuthUsers() map[string]string {
 			username := strings.TrimSpace(parts[0])
 			password := strings.TrimSpace(parts[1])
 			if username != "" && password != "" {
+				// 暂时使用明文存储，用于测试
 				users[username] = password
 			}
 		}
@@ -573,14 +576,16 @@ func getAuthTokenExpiry() time.Duration {
 func getAuthJWTSecret() string {
 	secret := os.Getenv("AUTH_JWT_SECRET")
 	if secret == "" {
-		// 生成随机密钥（32字节）
-		import_crypto := "crypto/rand"
-		import_encoding := "encoding/base64"
-		_ = import_crypto
-		_ = import_encoding
-		// 注意：实际使用时应该使用crypto/rand生成随机密钥
-		// 这里为了简化，使用时间戳作为临时密钥
-		secret = "pansou-default-secret-" + strconv.FormatInt(time.Now().Unix(), 10)
+		// 生成安全的随机密钥（32字节）
+		b := make([]byte, 32)
+		_, err := rand.Read(b)
+		if err == nil {
+			// 使用 base64 编码生成字符串密钥
+			secret = base64.StdEncoding.EncodeToString(b)
+		} else {
+			// 生成失败时使用时间戳作为后备
+			secret = "pansou-default-secret-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+		}
 	}
 	return secret
 }

@@ -48,7 +48,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { authApi } from '../utils/api'
 
 const router = useRouter()
 
@@ -69,7 +69,7 @@ const handleLogin = async () => {
   
   try {
     // 发送登录请求
-    const response = await axios.post('/api/auth/login', loginForm.value)
+    const response = await authApi.login(loginForm.value.username, loginForm.value.password)
     
     if (response.data.code === 200) {
       // 保存token到localStorage
