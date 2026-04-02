@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova Search — 网盘资源搜索</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-glass: rgba(255, 255, 255, 0.03);
+            --bg-glass-hover: rgba(255, 255, 255, 0.06);
+            --border-glass: rgba(255, 255, 255, 0.08);
+            --border-glass-hover: rgba(255, 255, 255, 0.15);
+            --text-primary: #f0f0f5;
+            --text-secondary: rgba(240, 240, 245, 0.55);
+            --text-muted: rgba(240, 240, 245, 0.3);
+            --accent-1: #6c5ce7;
+            --accent-2: #a29bfe;
+            --accent-3: #00cec9;
+            --accent-4: #fd79a8;
+            --accent-5: #fdcb6e;
+            --gradient-main: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 40%, #00cec9 100%);
+            --gradient-warm: linear-gradient(135deg, #fd79a8 0%, #fdcb6e 100%);
+            --shadow-glow: 0 0 80px rgba(108, 92, 231, 0.15);
+            --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
+            --radius-sm: 8px;
+            --radius-md: 16px;
+            --radius-lg: 24px;
+            --radius-xl: 32px;
+            --font-display: 'Outfit', sans-serif;
+            --font-mono: 'Space Mono', monospace;
+            /* 网盘品牌色 */
+            --color-aliyun: #ff6a00;
+            --color-baidu: #2932e1;
+            --color-115: #fba800;
+            --color-quark: #6236ff;
+            --color-123: #e4393c;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: var(--font-display);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ===== Animated Background ===== */
+        .bg-canvas {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0; overflow: hidden;
+        }
+        .bg-orb {
+            position: absolute; border-radius: 50%;
+            filter: blur(120px); opacity: 0.35;
+            animation: orbFloat 20s ease-in-out infinite;
+        }
+        .bg-orb:nth-child(1) {
+            width: 600px; height: 600px;
+            background: radial-gradient(circle, var(--accent-1) 0%, transparent 70%);
+            top: -15%; left: -10%; animation-duration: 25s;
+        }
+        .bg-orb:nth-child(2) {
+            width: 500px; height: 500px;
+            background: radial-gradient(circle, var(--accent-3) 0%, transparent 70%);
+            top: 50%; right: -15%; animation-duration: 20s; animation-delay: -5s;
+        }
+        .bg-orb:nth-child(3) {
+            width: 400px; height: 400px;
+            background: radial-gradient(circle, var(--accent-4) 0%, transparent 70%);
+            bottom: -10%; left: 30%; animation-duration: 22s; animation-delay: -10s; opacity: 0.18;
+        }
+        @keyframes orbFloat {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(50px, -30px) scale(1.05); }
+            50% { transform: translate(-20px, 40px) scale(0.95); }
+            75% { transform: translate(30px, 20px) scale(1.02); }
+        }
+        .bg-grid {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; z-index: 1; pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+        .bg-noise {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; z-index: 2;
+            opacity: 0.03; pointer-events: none;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+        }
+
+        /* ===== Animations ===== */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== Top Bar (results page only) ===== */
+        .top-bar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            padding: 16px 32px;
+            display: none; /* hidden on home */
+            align-items: center; gap: 20px;
+            backdrop-filter: blur(20px);
+            background: rgba(10, 10, 15, 0.7);
+            border-bottom: 1px solid var(--border-glass);
+            animation: slideDown 0.5s ease-out;
+        }
+        .top-bar.visible { display: flex; }
+        .top-bar-logo {
+            display: flex; align-items: center; gap: 10px;
+            text-decoration: none; flex-shrink: 0; cursor: pointer;
+        }
+        .top-bar-logo-icon {
+            width: 32px; height: 32px; border-radius: 8px;
+            background: var(--gradient-main);
+            display: flex; align-items: center; justify-content: center;
+            position: relative; overflow: hidden;
+        }
+        .top-bar-logo-icon::after {
+            content: ''; position: absolute; inset: 2px;
+            border-radius: 6px; background: var(--bg-primary);
+        }
+        .top-bar-logo-icon svg {
+            position: relative; z-index: 1; width: 16px; height: 16px;
+        }
+        .top-bar-logo-text {
+            font-size: 18px; font-weight: 700; color: var(--text-primary);
+            letter-spacing: -0.5px;
+        }
+        .top-bar-search {
+            flex: 1; max-width: 560px; position: relative;
+        }
+        .top-bar-search-box {
+            display: flex; align-items: center;
+            padding: 10px 16px; gap: 10px;
+            border-radius: 100px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            transition: all 0.3s ease;
+        }
+        .top-bar-search-box:focus-within {
+            border-color: var(--border-glass-hover);
+            box-shadow: 0 0 30px rgba(108, 92, 231, 0.1);
+        }
+        .top-bar-search-icon {
+            width: 18px; height: 18px; color: var(--text-muted); flex-shrink: 0;
+        }
+        .top-bar-search-input {
+            flex: 1; background: none; border: none; outline: none;
+            font-family: var(--font-display); font-size: 15px;
+            color: var(--text-primary); padding: 4px 0;
+        }
+        .top-bar-search-input::placeholder { color: var(--text-muted); }
+        .top-bar-search-btn {
+            padding: 8px 20px; border-radius: 100px; border: none;
+            background: var(--gradient-main); color: white;
+            font-family: var(--font-display); font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: all 0.3s ease; flex-shrink: 0;
+        }
+        .top-bar-search-btn:hover {
+            transform: scale(1.03);
+            box-shadow: 0 4px 16px rgba(108, 92, 231, 0.35);
+        }
+
+        /* ===== Home Page ===== */
+        .home-page {
+            position: relative; z-index: 10;
+            min-height: 100vh;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 60px 24px;
+            transition: opacity 0.4s ease;
+        }
+        .home-page.hidden { display: none; }
+
+        /* Logo */
+        .home-logo {
+            display: flex; align-items: center; gap: 16px;
+            margin-bottom: 48px; text-decoration: none;
+            animation: fadeInUp 0.8s ease-out;
+        }
+        .home-logo-icon {
+            width: 56px; height: 56px; border-radius: 16px;
+            background: var(--gradient-main);
+            display: flex; align-items: center; justify-content: center;
+            position: relative; overflow: hidden;
+            box-shadow: 0 8px 32px rgba(108, 92, 231, 0.3);
+        }
+        .home-logo-icon::after {
+            content: ''; position: absolute; inset: 3px;
+            border-radius: 13px; background: var(--bg-primary);
+        }
+        .home-logo-icon svg {
+            position: relative; z-index: 1; width: 26px; height: 26px;
+        }
+        .home-logo-text {
+            font-size: 36px; font-weight: 800; color: var(--text-primary);
+            letter-spacing: -1.5px;
+        }
+        .home-logo-sub {
+            font-size: 13px; color: var(--text-muted);
+            font-weight: 400; letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+
+        /* Search Box (home) */
+        .home-search-container {
+            width: 100%; max-width: 640px;
+            animation: fadeInUp 0.8s ease-out 0.15s both;
+        }
+        .search-box {
+            position: relative; width: 100%;
+            border-radius: var(--radius-xl);
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            backdrop-filter: blur(20px);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: visible;
+        }
+        .search-box::before {
+            content: ''; position: absolute; inset: -1px;
+            border-radius: var(--radius-xl); padding: 1px;
+            background: linear-gradient(135deg, transparent 0%, var(--accent-1) 50%, var(--accent-3) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor; mask-composite: exclude;
+            opacity: 0; transition: opacity 0.4s ease; pointer-events: none;
+        }
+        .search-box:focus-within {
+            border-color: transparent;
+            box-shadow: var(--shadow-glow), var(--shadow-card);
+            transform: translateY(-2px);
+        }
+        .search-box:focus-within::before { opacity: 1; }
+
+        .search-input-wrapper {
+            display: flex; align-items: center;
+            padding: 8px 8px 8px 24px; gap: 12px;
+        }
+        .search-icon {
+            flex-shrink: 0; width: 22px; height: 22px;
+            color: var(--text-muted); transition: color 0.3s ease;
+        }
+        .search-box:focus-within .search-icon { color: var(--accent-2); }
+        .search-input {
+            flex: 1; background: none; border: none; outline: none;
+            font-family: var(--font-display); font-size: 17px; font-weight: 400;
+            color: var(--text-primary); padding: 14px 0; letter-spacing: -0.2px;
+        }
+        .search-input::placeholder { color: var(--text-muted); font-weight: 300; }
+        .search-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .search-btn {
+            padding: 12px 28px; border-radius: 100px; border: none;
+            background: var(--gradient-main); color: white;
+            font-family: var(--font-display); font-size: 15px; font-weight: 600;
+            cursor: pointer; transition: all 0.3s ease; letter-spacing: -0.2px;
+            position: relative; overflow: hidden;
+        }
+        .search-btn::before {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%);
+            opacity: 0; transition: opacity 0.3s ease;
+        }
+        .search-btn:hover {
+            transform: scale(1.03);
+            box-shadow: 0 4px 20px rgba(108, 92, 231, 0.4);
+        }
+        .search-btn:hover::before { opacity: 1; }
+        .search-btn:active { transform: scale(0.98); }
+
+        /* Home footer hint */
+        .home-hint {
+            margin-top: 40px; text-align: center;
+            animation: fadeInUp 0.8s ease-out 0.3s both;
+        }
+        .home-hint-text {
+            font-size: 13px; color: var(--text-muted);
+        }
+        .home-hint-text span { color: var(--text-secondary); }
+
+        /* ===== Results Page ===== */
+        .results-page {
+            position: relative; z-index: 10;
+            min-height: 100vh; padding: 90px 24px 60px;
+            display: none;
+        }
+        .results-page.visible { display: block; }
+
+        .results-header {
+            max-width: 960px; margin: 0 auto 32px;
+            animation: fadeInUp 0.5s ease-out;
+        }
+        .results-query-info {
+            font-size: 14px; color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        .results-query-info strong {
+            color: var(--text-primary); font-weight: 600;
+        }
+        .results-count {
+            font-size: 13px; color: var(--text-muted);
+        }
+
+        /* Filter tabs */
+        .results-filters {
+            max-width: 960px; margin: 0 auto 28px;
+            display: flex; gap: 8px; flex-wrap: wrap;
+            animation: fadeInUp 0.5s ease-out 0.1s both;
+        }
+        .filter-tab {
+            padding: 8px 18px; border-radius: 100px;
+            border: 1px solid var(--border-glass);
+            background: transparent; color: var(--text-secondary);
+            font-family: var(--font-display); font-size: 13px; font-weight: 500;
+            cursor: pointer; transition: all 0.3s ease;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .filter-tab:hover {
+            background: var(--bg-glass-hover);
+            border-color: var(--border-glass-hover);
+            color: var(--text-primary);
+        }
+        .filter-tab.active {
+            background: var(--accent-1);
+            border-color: var(--accent-1);
+            color: white;
+        }
+        .filter-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .filter-count {
+            font-size: 11px; opacity: 0.7;
+            font-family: var(--font-mono);
+        }
+
+        /* Result groups */
+        .results-groups {
+            max-width: 960px; margin: 0 auto;
+            display: flex; flex-direction: column; gap: 32px;
+        }
+
+        .result-group {
+            animation: fadeInUp 0.5s ease-out both;
+        }
+        .result-group:nth-child(1) { animation-delay: 0.15s; }
+        .result-group:nth-child(2) { animation-delay: 0.25s; }
+        .result-group:nth-child(3) { animation-delay: 0.35s; }
+        .result-group:nth-child(4) { animation-delay: 0.45s; }
+        .result-group:nth-child(5) { animation-delay: 0.55s; }
+
+        .group-header {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 14px; padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-glass);
+        }
+        .group-icon {
+            width: 32px; height: 32px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: 800; color: white;
+            flex-shrink: 0;
+        }
+        .group-name {
+            font-size: 16px; font-weight: 700; color: var(--text-primary);
+            letter-spacing: -0.3px;
+        }
+        .group-count {
+            font-size: 12px; color: var(--text-muted);
+            font-family: var(--font-mono);
+            margin-left: auto;
+        }
+
+        /* Result items */
+        .result-list {
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .result-item {
+            display: flex; align-items: center; gap: 16px;
+            padding: 16px 20px;
+            border-radius: var(--radius-md);
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            transition: all 0.3s ease;
+            text-decoration: none;
+            backdrop-filter: blur(10px);
+        }
+        .result-item:hover {
+            background: var(--bg-glass-hover);
+            border-color: var(--border-glass-hover);
+            transform: translateX(4px);
+            box-shadow: var(--shadow-card);
+        }
+        .result-item-index {
+            font-family: var(--font-mono); font-size: 12px;
+            font-weight: 700; color: var(--text-muted);
+            min-width: 24px; text-align: center; flex-shrink: 0;
+        }
+        .result-item-info { flex: 1; min-width: 0; }
+        .result-item-name {
+            font-size: 15px; font-weight: 500; color: var(--text-primary);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            margin-bottom: 4px;
+            transition: color 0.3s ease;
+        }
+        .result-item:hover .result-item-name { color: var(--accent-2); }
+        .result-item-link {
+            font-size: 12px; color: var(--text-muted);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            font-family: var(--font-mono);
+            transition: color 0.3s ease;
+        }
+        .result-item:hover .result-item-link { color: var(--text-secondary); }
+        .result-item-arrow {
+            flex-shrink: 0; width: 20px; height: 20px;
+            color: var(--text-muted); transition: all 0.3s ease;
+            opacity: 0; transform: translateX(-8px);
+        }
+        .result-item:hover .result-item-arrow {
+            opacity: 1; transform: translateX(0); color: var(--accent-2);
+        }
+
+        /* Empty state */
+        .results-empty {
+            max-width: 960px; margin: 0 auto;
+            text-align: center; padding: 80px 20px;
+            animation: fadeIn 0.5s ease-out;
+        }
+        .results-empty-icon {
+            font-size: 48px; margin-bottom: 16px; opacity: 0.3;
+        }
+        .results-empty-text {
+            font-size: 16px; color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        .results-empty-hint {
+            font-size: 13px; color: var(--text-muted);
+        }
+
+        /* ===== Toast ===== */
+        .toast {
+            position: fixed; bottom: 32px; left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 14px 28px; border-radius: 100px;
+            background: rgba(18, 18, 26, 0.95);
+            border: 1px solid var(--border-glass);
+            backdrop-filter: blur(20px);
+            color: var(--text-primary); font-size: 14px; font-weight: 500;
+            z-index: 200; display: flex; align-items: center; gap: 10px;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow-card);
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        .toast-icon { width: 18px; height: 18px; color: var(--accent-3); }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 768px) {
+            .top-bar { padding: 12px 16px; }
+            .home-logo { gap: 12px; margin-bottom: 36px; }
+            .home-logo-icon { width: 44px; height: 44px; border-radius: 12px; }
+            .home-logo-icon svg { width: 20px; height: 20px; }
+            .home-logo-text { font-size: 28px; }
+            .search-input-wrapper { padding: 6px 6px 6px 18px; }
+            .search-input { font-size: 15px; }
+            .search-btn { padding: 10px 20px; font-size: 14px; }
+            .results-page { padding: 80px 16px 40px; }
+            .result-item { padding: 12px 14px; gap: 10px; }
+            .result-item-name { font-size: 14px; }
+            .results-filters { gap: 6px; }
+            .filter-tab { padding: 6px 14px; font-size: 12px; }
+        }
+
+        /* ===== Scrollbar ===== */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-glass); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--border-glass-hover); }
+    </style>
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="bg-canvas">
+        <div class="bg-orb"></div>
+        <div class="bg-orb"></div>
+        <div class="bg-orb"></div>
+    </div>
+    <div class="bg-grid"></div>
+    <div class="bg-noise"></div>
+
+    <!-- Top Bar (results page) -->
+    <div class="top-bar" id="topBar">
+        <a class="top-bar-logo" id="backHome">
+            <div class="top-bar-logo-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="url(#logoGrad2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <defs>
+                        <linearGradient id="logoGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#6c5ce7"/>
+                            <stop offset="100%" style="stop-color:#00cec9"/>
+                        </linearGradient>
+                    </defs>
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35"/>
+                </svg>
+            </div>
+            <span class="top-bar-logo-text">Nova</span>
+        </a>
+        <div class="top-bar-search">
+            <div class="top-bar-search-box">
+                <svg class="top-bar-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input type="text" class="top-bar-search-input" id="topSearchInput" placeholder="搜索网盘资源..." autocomplete="off">
+                <button class="top-bar-search-btn" id="topSearchBtn">搜索</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Home Page -->
+    <div class="home-page" id="homePage">
+        <a class="home-logo" href="#">
+            <div class="home-logo-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="url(#logoGrad3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <defs>
+                        <linearGradient id="logoGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#6c5ce7"/>
+                            <stop offset="100%" style="stop-color:#00cec9"/>
+                        </linearGradient>
+                    </defs>
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35"/>
+                </svg>
+            </div>
+            <div>
+                <div class="home-logo-text">Nova Search</div>
+                <div class="home-logo-sub">网盘资源搜索引擎</div>
+            </div>
+        </a>
+
+        <div class="home-search-container">
+            <div class="search-box" id="searchBox">
+                <div class="search-input-wrapper">
+                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                    </svg>
+                    <input type="text" class="search-input" id="searchInput" placeholder="搜索网盘资源..." autocomplete="off">
+                    <div class="search-actions">
+                        <button class="search-btn" id="searchBtn">搜索</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="home-hint">
+            <p class="home-hint-text">支持搜索 <span>阿里云盘</span> · <span>百度网盘</span> · <span>115网盘</span> · <span>夸克网盘</span> · <span>123网盘</span> 资源</p>
+        </div>
+    </div>
+
+    <!-- Results Page -->
+    <div class="results-page" id="resultsPage">
+        <div class="results-header" id="resultsHeader"></div>
+        <div class="results-filters" id="resultsFilters"></div>
+        <div class="results-groups" id="resultsGroups"></div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        <span id="toastText">正在搜索...</span>
+    </div>
+
+    <script>
+        // ===== 网盘配置 =====
+        const DISK_TYPES = [
+            { id: 'aliyun', name: '阿里云盘', color: '#ff6a00', icon: '阿' },
+            { id: 'baidu',  name: '百度网盘', color: '#2932e1', icon: '百' },
+            { id: '115',    name: '115网盘',  color: '#fba800', icon: '115' },
+            { id: 'quark',  name: '夸克网盘', color: '#6236ff', icon: '夸' },
+            { id: '123',    name: '123网盘',  color: '#e4393c', icon: '123' },
+        ];
+
+        // ===== 模拟数据 =====
+        const MOCK_DATA = {
+            '电影': {
+                aliyun: [
+                    { name: '沙丘2.4K超清版.2024.mkv', link: 'https://www.aliyundrive.com/s/abc123def456' },
+                    { name: '奥本海默.IMAX.2160p.mp4', link: 'https://www.aliyundrive.com/s/xyz789ghi012' },
+                    { name: '流浪地球3.导演剪辑版.mp4', link: 'https://www.aliyundrive.com/s/mno345pqr678' },
+                ],
+                baidu: [
+                    { name: '星际穿越.4K.杜比全景声.mp4', link: 'https://pan.baidu.com/s/1kV3xY7z' },
+                    { name: '盗梦空间.蓝光重制版.mkv', link: 'https://pan.baidu.com/s/2mP9wQ4r' },
+                ],
+                '115': [
+                    { name: '黑客帝国全四部.合集.4K', link: 'https://115.com/s/sw6f8g9h' },
+                ],
+                quark: [
+                    { name: '阿凡达3.水之道.2160p.mp4', link: 'https://pan.quark.cn/s/abc123' },
+                    { name: '疯狂动物城2.1080p.mp4', link: 'https://pan.quark.cn/s/def456' },
+                    { name: '你的名字.4K修复版.mkv', link: 'https://pan.quark.cn/s/ghi789' },
+                ],
+                '123': [
+                    { name: '千与千寻.4K.日语原声.mp4', link: 'https://www.123pan.com/s/abc123' },
+                    { name: '龙猫.修复版.1080p.mp4', link: 'https://www.123pan.com/s/def456' },
+                ],
+            },
+            '教程': {
+                aliyun: [
+                    { name: 'Python全栈开发.零基础到精通.2024', link: 'https://www.aliyundrive.com/s/py2024full' },
+                    { name: 'React18+TypeScript企业级实战', link: 'https://www.aliyundrive.com/s/react18ts' },
+                ],
+                baidu: [
+                    { name: 'Java面试八股文.2024最新版', link: 'https://pan.baidu.com/s/java8gu' },
+                    { name: '数据结构与算法.图解教程', link: 'https://pan.baidu.com/s/dsalgo' },
+                    { name: 'Linux运维从入门到精通', link: 'https://pan.baidu.com/s/linuxops' },
+                ],
+                '115': [
+                    { name: 'Figma产品设计系统全流程', link: 'https://115.com/s/figmads' },
+                ],
+                quark: [
+                    { name: 'ChatGPT+AI绘画实战课', link: 'https://pan.quark.cn/s/aigc2024' },
+                    { name: '前端性能优化深度指南', link: 'https://pan.quark.cn/s/fepo' },
+                ],
+                '123': [
+                    { name: 'Go语言微服务架构实战', link: 'https://www.123pan.com/s/gomicro' },
+                ],
+            },
+            '软件': {
+                aliyun: [
+                    { name: 'Adobe全家桶2024.一键安装包', link: 'https://www.aliyundrive.com/s/adobe2024' },
+                    { name: 'JetBrains全系列激活工具', link: 'https://www.aliyundrive.com/s/jbtools' },
+                    { name: 'Windows11精简版.GHO镜像', link: 'https://www.aliyundrive.com/s/win11lite' },
+                ],
+                baidu: [
+                    { name: 'Office2024专业增强版', link: 'https://pan.baidu.com/s/office24' },
+                    { name: 'Final Cut Pro.完整版', link: 'https://pan.baidu.com/s/fcpx' },
+                ],
+                quark: [
+                    { name: 'DaVinci Resolve Studio.18.6', link: 'https://pan.quark.cn/s/davinci' },
+                ],
+                '123': [
+                    { name: 'CLion2024.激活教程+工具', link: 'https://www.123pan.com/s/clion24' },
+                ],
+            },
+            'default': {
+                aliyun: [
+                    { name: '资源合集一.7z', link: 'https://www.aliyundrive.com/s/res001' },
+                    { name: '精选资源包.zip', link: 'https://www.aliyundrive.com/s/res002' },
+                ],
+                baidu: [
+                    { name: '百度网盘资源分享', link: 'https://pan.baidu.com/s/bdres01' },
+                    { name: '热门资源合集', link: 'https://pan.baidu.com/s/bdres02' },
+                    { name: '精品资源推荐', link: 'https://pan.baidu.com/s/bdres03' },
+                ],
+                '115': [
+                    { name: '115网盘精选资源', link: 'https://115.com/s/115res01' },
+                ],
+                quark: [
+                    { name: '夸克网盘资源分享', link: 'https://pan.quark.cn/s/qkres01' },
+                    { name: '热门文件合集', link: 'https://pan.quark.cn/s/qkres02' },
+                ],
+                '123': [
+                    { name: '123网盘资源推荐', link: 'https://www.123pan.com/s/123res01' },
+                ],
+            }
+        };
+
+        // ===== DOM =====
+        const homePage = document.getElementById('homePage');
+        const resultsPage = document.getElementById('resultsPage');
+        const topBar = document.getElementById('topBar');
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const topSearchInput = document.getElementById('topSearchInput');
+        const topSearchBtn = document.getElementById('topSearchBtn');
+        const resultsHeader = document.getElementById('resultsHeader');
+        const resultsFilters = document.getElementById('resultsFilters');
+        const resultsGroups = document.getElementById('resultsGroups');
+        const toast = document.getElementById('toast');
+        const toastText = document.getElementById('toastText');
+
+        let currentFilter = 'all';
+        let currentQuery = '';
+
+        // ===== 搜索逻辑 =====
+        function performSearch(query) {
+            if (!query || !query.trim()) return;
+            currentQuery = query.trim();
+            currentFilter = 'all';
+
+            // 切换到结果页
+            homePage.classList.add('hidden');
+            resultsPage.classList.add('visible');
+            topBar.classList.add('visible');
+            topSearchInput.value = currentQuery;
+
+            // 匹配数据
+            let matchedData = null;
+            for (const key of Object.keys(MOCK_DATA)) {
+                if (key !== 'default' && currentQuery.includes(key)) {
+                    matchedData = MOCK_DATA[key];
+                    break;
+                }
+            }
+            if (!matchedData) matchedData = MOCK_DATA['default'];
+
+            // 计算总数
+            let totalCount = 0;
+            const groupCounts = {};
+            DISK_TYPES.forEach(disk => {
+                const items = matchedData[disk.id] || [];
+                groupCounts[disk.id] = items.length;
+                totalCount += items.length;
+            });
+
+            // 渲染头部
+            resultsHeader.innerHTML = `
+                <div class="results-query-info">搜索 <strong>"${escapeHtml(currentQuery)}"</strong> 的结果</div>
+                <div class="results-count">共找到 ${totalCount} 条资源</div>
+            `;
+
+            // 渲染筛选标签
+            renderFilters(groupCounts);
+
+            // 渲染结果分组
+            renderResults(matchedData);
+
+            window.scrollTo({ top: 0 });
+        }
+
+        function renderFilters(groupCounts) {
+            let html = `<button class="filter-tab active" data-filter="all">
+                全部 <span class="filter-count">${Object.values(groupCounts).reduce((a, b) => a + b, 0)}</span>
+            </button>`;
+
+            DISK_TYPES.forEach(disk => {
+                const count = groupCounts[disk.id] || 0;
+                if (count > 0) {
+                    html += `<button class="filter-tab" data-filter="${disk.id}">
+                        <span class="filter-dot" style="background:${disk.color}"></span>
+                        ${disk.name} <span class="filter-count">${count}</span>
+                    </button>`;
+                }
+            });
+
+            resultsFilters.innerHTML = html;
+
+            // 绑定事件
+            resultsFilters.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    resultsFilters.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentFilter = tab.dataset.filter;
+
+                    // 重新匹配数据并渲染
+                    let matchedData = null;
+                    for (const key of Object.keys(MOCK_DATA)) {
+                        if (key !== 'default' && currentQuery.includes(key)) {
+                            matchedData = MOCK_DATA[key];
+                            break;
+                        }
+                    }
+                    if (!matchedData) matchedData = MOCK_DATA['default'];
+                    renderResults(matchedData);
+                });
+            });
+        }
+
+        function renderResults(data) {
+            let html = '';
+            let globalIndex = 0;
+
+            DISK_TYPES.forEach(disk => {
+                const items = data[disk.id] || [];
+                if (items.length === 0) return;
+                if (currentFilter !== 'all' && currentFilter !== disk.id) return;
+
+                html += `
+                <div class="result-group">
+                    <div class="group-header">
+                        <div class="group-icon" style="background:${disk.color}">${disk.icon}</div>
+                        <span class="group-name">${disk.name}</span>
+                        <span class="group-count">${items.length} 条结果</span>
+                    </div>
+                    <div class="result-list">
+                `;
+
+                items.forEach(item => {
+                    globalIndex++;
+                    html += `
+                    <a class="result-item" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">
+                        <span class="result-item-index">${String(globalIndex).padStart(2, '0')}</span>
+                        <div class="result-item-info">
+                            <div class="result-item-name">${escapeHtml(item.name)}</div>
+                            <div class="result-item-link">${escapeHtml(item.link)}</div>
+                        </div>
+                        <svg class="result-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                        </svg>
+                    </a>`;
+                });
+
+                html += `</div></div>`;
+            });
+
+            if (!html) {
+                html = `
+                <div class="results-empty">
+                    <div class="results-empty-icon">🔍</div>
+                    <div class="results-empty-text">未找到相关资源</div>
+                    <div class="results-empty-hint">试试其他关键词，如"电影"、"教程"、"软件"</div>
+                </div>`;
+            }
+
+            resultsGroups.innerHTML = html;
+        }
+
+        // ===== 返回首页 =====
+        function goHome() {
+            resultsPage.classList.remove('visible');
+            topBar.classList.remove('visible');
+            homePage.classList.remove('hidden');
+            searchInput.value = '';
+            searchInput.focus();
+            window.scrollTo({ top: 0 });
+        }
+
+        document.getElementById('backHome').addEventListener('click', (e) => {
+            e.preventDefault();
+            goHome();
+        });
+
+        // ===== 事件绑定 =====
+        searchBtn.addEventListener('click', () => performSearch(searchInput.value));
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') performSearch(searchInput.value);
+        });
+        topSearchBtn.addEventListener('click', () => performSearch(topSearchInput.value));
+        topSearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') performSearch(topSearchInput.value);
+        });
+
+        // 键盘快捷键
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '/' && document.activeElement !== searchInput && document.activeElement !== topSearchInput) {
+                e.preventDefault();
+                if (homePage.classList.contains('hidden')) {
+                    topSearchInput.focus();
+                } else {
+                    searchInput.focus();
+                }
+            }
+            if (e.key === 'Escape') {
+                if (!homePage.classList.contains('hidden')) {
+                    searchInput.blur();
+                }
+            }
+        });
+
+        // ===== Toast =====
+        function showToast(message) {
+            toastText.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // ===== 工具函数 =====
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // ===== 视差效果 =====
+        document.addEventListener('mousemove', (e) => {
+            const orbs = document.querySelectorAll('.bg-orb');
+            const x = (e.clientX / window.innerWidth - 0.5) * 2;
+            const y = (e.clientY / window.innerHeight - 0.5) * 2;
+            orbs.forEach((orb, i) => {
+                const speed = (i + 1) * 8;
+                orb.style.transform = `translate(${x * speed}px, ${y * speed}px)`;
+            });
+        });
+    </script>
+</body>
+</html>
