@@ -124,7 +124,7 @@ const performSearch = async (query: string) => {
   
   try {
     // 调用后端API
-    const response = await fetch(`/api/search?kw=${encodeURIComponent(query)}`);
+    const response = await fetch(`http://localhost:8888/api/search?kw=${encodeURIComponent(query)}`);
     if (!response.ok) {
       throw new Error('搜索失败');
     }
